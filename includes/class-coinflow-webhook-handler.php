@@ -164,10 +164,16 @@ class Coinflow_Webhook_Handler
                 return new WP_REST_Response(['ok' => true], 200);
 
             case self::EVT_REFUND:
-                // Only a paid order can move to `refunded`; a stray refund for an
-                // unpaid order is noted rather than faking a paid-then-refunded
-                // state (mirrors the chargeback branch).
-                if ($order->is_paid()) {
+                if ($order->get_total_refunded() > 0) {
+                    // WooCommerce already recorded this refund (the merchant
+                    // clicked Refund in WooCommerce, which called Coinflow, and
+                    // WooCommerce set the correct full/partial status). Don't
+                    // override it — just confirm receipt.
+                    $order->add_order_note(__('Coinflow confirmed the refund.', 'coinflow-payments'));
+                } elseif ($order->is_paid()) {
+                    // Refund initiated on the Coinflow side (dashboard) — reflect
+                    // it in WooCommerce. A stray refund for an unpaid order is
+                    // only noted (mirrors the chargeback branch).
                     $order->update_status('refunded', __('Coinflow reported a refund.', 'coinflow-payments'));
                 } else {
                     $order->add_order_note(__('Coinflow reported a refund for an order with no captured payment.', 'coinflow-payments'));

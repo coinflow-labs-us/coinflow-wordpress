@@ -86,6 +86,14 @@ class Coinflow_API_Client
             ],
         ];
 
+        // Prefill the Coinflow checkout with the billing details WooCommerce
+        // already collected (better UX + AVS/fraud signals). Only sent when at
+        // least one field is present.
+        $customer_info = self::customer_info($order);
+        if (!empty($customer_info)) {
+            $body['customerInfo'] = $customer_info;
+        }
+
         $response = wp_remote_post($this->base_url() . '/api/checkout/link', [
             'timeout' => 20,
             'headers' => [
@@ -128,6 +136,87 @@ class Coinflow_API_Client
     }
 
     /**
+     * Refund a settled Coinflow payment. Omit $amount_cents for a full refund;
+     * pass it for a partial refund (must be <= the payment total). The refund is
+     * executed by Coinflow and appears in the merchant dashboard.
+     *
+     * @param string   $payment_id   The Coinflow payment id (data.id from the Settled webhook).
+     * @param int|null $amount_cents  Partial amount in cents, or null for a full refund.
+     * @param string   $reason        One of Coinflow's RefundReason values.
+     * @return array|int|string|WP_Error  Refund job id on success, WP_Error on failure.
+     */
+    public function refund_payment(string $payment_id, ?int $amount_cents, string $reason)
+    {
+        if ('' === trim($this->api_key)) {
+            return new WP_Error('coinflow_no_api_key', __('Coinflow API key is not configured.', 'coinflow-payments'));
+        }
+        if ('' === trim($payment_id)) {
+            return new WP_Error('coinflow_no_payment_id', __('This order has no Coinflow payment id to refund.', 'coinflow-payments'));
+        }
+
+        $body = ['refundReason' => $reason];
+        if (null !== $amount_cents) {
+            $body['partialAmount'] = ['cents' => $amount_cents];
+        }
+
+        $response = wp_remote_request(
+            $this->base_url() . '/api/merchant/payments/' . rawurlencode($payment_id) . '/refund',
+            [
+                'method'  => 'PUT',
+                'timeout' => 30,
+                'headers' => [
+                    'Content-Type'  => 'application/json',
+                    'Authorization' => $this->api_key,
+                ],
+                'body'    => wp_json_encode($body),
+            ]
+        );
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $code = (int) wp_remote_retrieve_response_code($response);
+        $raw  = wp_remote_retrieve_body($response);
+
+        if ($code < 200 || $code >= 300) {
+            return new WP_Error(
+                'coinflow_refund_failed',
+                self::api_message($raw) ?: sprintf(
+                    /* translators: %d: HTTP status code. */
+                    __('Coinflow refund failed (status %d).', 'coinflow-payments'),
+                    $code
+                ),
+                ['status' => $code, 'body' => self::excerpt($raw)]
+            );
+        }
+
+        return json_decode($raw, true);
+    }
+
+    /**
+     * Pull the most useful human-readable text out of a Coinflow error body.
+     * Prefers `details` (specific, e.g. "Payment not found") over the generic
+     * top-level `message`.
+     *
+     * @param string $raw
+     * @return string
+     */
+    private static function api_message(string $raw): string
+    {
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return '';
+        }
+        foreach (['details', 'message'] as $key) {
+            if (!empty($decoded[$key]) && is_string($decoded[$key])) {
+                return $decoded[$key];
+            }
+        }
+        return '';
+    }
+
+    /**
      * Stable per-customer id for x-coinflow-auth-user-id. Logged-in users get a
      * durable id; guests get a deterministic id derived from their email so
      * repeat guest purchases reuse the same Coinflow customer.
@@ -145,6 +234,52 @@ class Coinflow_API_Client
         }
 
         return 'guest-order-' . $order->get_id();
+    }
+
+    /**
+     * Map the order's billing details to Coinflow's customerInfo so the checkout
+     * arrives pre-filled. Blank fields are omitted; firstName/lastName are only
+     * sent together (both are @minLength 1), otherwise a combined `name` is used.
+     * Overridable via the `coinflow_customer_info` filter.
+     *
+     * @param WC_Order $order
+     * @return array
+     */
+    private static function customer_info(WC_Order $order): array
+    {
+        $info = [];
+
+        $first = trim((string) $order->get_billing_first_name());
+        $last  = trim((string) $order->get_billing_last_name());
+        if ('' !== $first && '' !== $last) {
+            $info['firstName'] = $first;
+            $info['lastName']  = $last;
+        } elseif ('' !== $first || '' !== $last) {
+            $info['name'] = trim($first . ' ' . $last);
+        }
+
+        $address = trim(
+            $order->get_billing_address_1()
+            . ' ' . $order->get_billing_address_2()
+        );
+
+        $fields = [
+            'address' => $address,
+            'city'    => (string) $order->get_billing_city(),
+            'state'   => (string) $order->get_billing_state(),
+            'zip'     => (string) $order->get_billing_postcode(),
+            'country' => (string) $order->get_billing_country(),
+            'email'   => (string) $order->get_billing_email(),
+            'ip'      => (string) WC_Geolocation::get_ip_address(),
+        ];
+        foreach ($fields as $key => $value) {
+            $value = trim($value);
+            if ('' !== $value) {
+                $info[$key] = $value;
+            }
+        }
+
+        return apply_filters('coinflow_customer_info', $info, $order);
     }
 
     /**
