@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Version is kept in lockstep with the VERSION file and readme.txt Stable tag.
-define('COINFLOW_PAYMENTS_VERSION', '0.1.0');
+define('COINFLOW_PAYMENTS_VERSION', '0.1.1');
 define('COINFLOW_PAYMENTS_FILE', __FILE__);
 define('COINFLOW_PAYMENTS_PATH', plugin_dir_path(__FILE__));
 define('COINFLOW_PAYMENTS_URL', plugin_dir_url(__FILE__));
