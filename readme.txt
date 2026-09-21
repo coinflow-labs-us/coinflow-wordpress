@@ -4,7 +4,7 @@ Tags: woocommerce, payments, payment gateway, checkout, coinflow
 Requires at least: 6.5
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -37,6 +37,9 @@ Features:
 Coinflow checkout links are locked to the IP address that created them. If your site sits behind a proxy or CDN, make sure WooCommerce is configured to detect the customer's real IP address. Advanced users can adjust the address sent to Coinflow with the `coinflow_customer_ip` filter.
 
 == Changelog ==
+
+= 0.1.2 =
+* Security: guest checkouts no longer reuse a Coinflow customer derived from the (unverified) billing email. Each guest order now uses a per-order customer id, so saved cards can no longer be shared between shoppers who enter the same email. Saved-card reuse now requires a logged-in WordPress account.
 
 = 0.1.0 =
 * Initial release. Redirect-based Coinflow checkout with webhook-driven order status, classic + block checkout support, and HPOS compatibility.

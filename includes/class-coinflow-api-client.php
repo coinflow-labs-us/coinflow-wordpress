@@ -217,20 +217,17 @@ class Coinflow_API_Client
     }
 
     /**
-     * Stable per-customer id for x-coinflow-auth-user-id. Logged-in users get a
-     * durable id; guests get a deterministic id derived from their email so
-     * repeat guest purchases reuse the same Coinflow customer.
+     * Stable per-customer id for x-coinflow-auth-user-id. Only a WordPress-
+     * authenticated user gets a durable, reusable customer id. Guests get a
+     * per-order id: a shopper-entered billing email is unverified, so a durable
+     * email-derived id would let anyone claim another customer's Coinflow
+     * identity (and their saved cards) just by typing their email.
      */
     private static function customer_id(WC_Order $order): string
     {
         $user_id = $order->get_user_id();
         if ($user_id) {
             return 'wp-' . $user_id;
-        }
-
-        $email = strtolower(trim($order->get_billing_email()));
-        if ('' !== $email) {
-            return 'guest-' . md5($email);
         }
 
         return 'guest-order-' . $order->get_id();

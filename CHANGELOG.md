@@ -2,6 +2,10 @@
 
 All notable changes to Coinflow Payments for WooCommerce are documented here.
 
+## 0.1.2
+
+- **Security fix.** Guest checkout uses order id as the customerId instead of using unverified email.
+
 ## 0.1.0
 
 - Initial release.

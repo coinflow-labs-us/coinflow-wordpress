@@ -3,7 +3,7 @@
  * Plugin Name:       Coinflow Payments for WooCommerce
  * Plugin URI:        https://github.com/coinflow-labs-us/coinflow-wordpress
  * Description:       Accept payments through Coinflow. Customers are redirected to a secure Coinflow checkout and returned to your store; orders are marked paid via Coinflow webhooks.
- * Version:           0.1.0
+ * Version:           0.1.2
  * Requires at least: 6.5
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Version is kept in lockstep with the VERSION file and readme.txt Stable tag.
-define('COINFLOW_PAYMENTS_VERSION', '0.1.1');
+define('COINFLOW_PAYMENTS_VERSION', '0.1.2');
 define('COINFLOW_PAYMENTS_FILE', __FILE__);
 define('COINFLOW_PAYMENTS_PATH', plugin_dir_path(__FILE__));
 define('COINFLOW_PAYMENTS_URL', plugin_dir_url(__FILE__));
